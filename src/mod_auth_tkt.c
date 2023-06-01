@@ -531,6 +531,8 @@ parse_ticket(request_rec *r, char **magic, auth_tkt *parsed)
 
   /* Basic length check for min size */
   if (len <= (sconf->digest_sz + TSTAMP_SZ))
+    ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, r,
+        "ticket length invalid: %d", len);
     return 0;
 
   /* See if there is a uid/data separator */
@@ -547,7 +549,11 @@ parse_ticket(request_rec *r, char **magic, auth_tkt *parsed)
       apr_base64_decode(buf, ticket);
       sepidx = ap_ind(buf, SEPARATOR);
       /* If still no sepidx, must be bogus */
-      if (sepidx == -1) return 0;
+      if (sepidx == -1) {
+        ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, r,
+            "No separator found, ticket must be bogus");
+        return 0;
+      }
       /* Update ticket and *magic to decoded version */
       ticket = *magic = buf;
     }
@@ -558,6 +564,8 @@ parse_ticket(request_rec *r, char **magic, auth_tkt *parsed)
   /* Recheck length */
   if (len <= (sconf->digest_sz + TSTAMP_SZ) ||
       sepidx < (sconf->digest_sz + TSTAMP_SZ))
+      ap_log_error(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, r,
+          "Ticket has invalid length after all");
     return 0;
 
   if (conf->debug >= 1) {
