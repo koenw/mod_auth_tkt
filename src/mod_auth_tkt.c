@@ -44,7 +44,7 @@
 #define FORCE_REFRESH 1
 #define CHECK_REFRESH 0
 
-#define TKT_AUTH_VERSION "2.3.99b1"
+#define TKT_AUTH_VERSION "2.3.99b4"
 
 /* ----------------------------------------------------------------------- */
 /* Per-directory configuration */
@@ -530,8 +530,11 @@ parse_ticket(request_rec *r, char **magic, auth_tkt *parsed)
   if (ticket[0] == '"') *magic = ++ticket;
 
   /* Basic length check for min size */
-  if (len <= (sconf->digest_sz + TSTAMP_SZ))
+  if (len <= (sconf->digest_sz + TSTAMP_SZ)) {
+    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, r,
+        "ticket length invalid: %d", len);
     return 0;
+  }
 
   /* See if there is a uid/data separator */
   sepidx = ap_ind(ticket, SEPARATOR);
@@ -547,7 +550,11 @@ parse_ticket(request_rec *r, char **magic, auth_tkt *parsed)
       apr_base64_decode(buf, ticket);
       sepidx = ap_ind(buf, SEPARATOR);
       /* If still no sepidx, must be bogus */
-      if (sepidx == -1) return 0;
+      if (sepidx == -1) {
+        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, r,
+            "No separator found, ticket must be bogus");
+        return 0;
+      }
       /* Update ticket and *magic to decoded version */
       ticket = *magic = buf;
     }
@@ -557,8 +564,11 @@ parse_ticket(request_rec *r, char **magic, auth_tkt *parsed)
 
   /* Recheck length */
   if (len <= (sconf->digest_sz + TSTAMP_SZ) ||
-      sepidx < (sconf->digest_sz + TSTAMP_SZ))
+      sepidx < (sconf->digest_sz + TSTAMP_SZ)) {
+    ap_log_rerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, r,
+          "Ticket has invalid length after all");
     return 0;
+  }
 
   if (conf->debug >= 1) {
     ap_log_rerror(APLOG_MARK, APLOG_DEBUG, APR_SUCCESS, r,
@@ -940,7 +950,7 @@ valid_ticket(request_rec *r, const char *source, char *ticket, auth_tkt *parsed,
   if (! parse_ticket(r, &ticket, parsed)) {
     if (conf->debug >= 1) {
       ap_log_rerror(APLOG_MARK, APLOG_WARNING, APR_SUCCESS, r,
-        "TKT valid_ticket: unparseable %s ticket found ('%s')", source, ticket);
+        "TKT valid_ticket (parse_ticket failed): unparseable %s ticket found ('%s')", source, ticket);
     }
     return 0;
   }
